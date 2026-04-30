@@ -1816,11 +1816,14 @@ function openChatScreen(msgId) {
   document.getElementById('adminChatScreen').classList.add('open');
   document.getElementById('csInput').focus();
 
-  // Mark as read
-  if (!m.read) {
-    _sb.from('messages').update({ read: true }).eq('id', msgId);
-    m.read = true;
-    renderMessages();
+  // Mark every unread message in THIS user's group as read (only this user's)
+  const unreadInGroup = userMsgs.filter(x => !x.read);
+  if (unreadInGroup.length > 0) {
+    unreadInGroup.forEach(x => {
+      _sb.from('messages').update({ read: true }).eq('id', x.id);
+      x.read = true;  // update local cache only for this user's messages
+    });
+    renderMessages(); // re-render so only this user's dot disappears
   }
 
   // Subscribe to realtime updates for this user's track_code
