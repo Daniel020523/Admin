@@ -1509,14 +1509,6 @@ document.addEventListener('keydown', e => {
     closeLightbox();
   }
 });
-// Phone back button: close chat screen if open
-window.addEventListener('popstate', function() {
-  const chatScreen = document.getElementById('adminChatScreen');
-  if (chatScreen && chatScreen.classList.contains('open')) {
-    closeChatScreen();
-  }
-});
-
 // ═══════════════════════════════════════════════════════════
 //  MESSAGES — REALTIME
 // ═══════════════════════════════════════════════════════════
@@ -1532,26 +1524,24 @@ let _pollInterval = null;
 function startPollingFallback() {
   if (_pollInterval) clearInterval(_pollInterval);
   _pollInterval = setInterval(async () => {
+    // Silent refresh in background
     try {
       const { data, error } = await _sb
         .from('messages')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      const fresh = data || [];
-      const prevIds = new Set(allMessages.map(m => m.id));
-      const newMsgs = fresh.filter(m => !prevIds.has(m.id));
-      // Preserve local read=true so dot doesn't reappear before DB confirms
-      const localReadIds = new Set(allMessages.filter(m => m.read).map(m => m.id));
-      allMessages = fresh.map(m => localReadIds.has(m.id) ? { ...m, read: true } : m);
+      const prev = allMessages.length;
+      allMessages = data || [];
       updateBadgeAndHeader();
       renderMessages();
-      if (newMsgs.length > 0) {
+      // If new messages arrived while realtime was down, flash
+      if (allMessages.length > prev) {
         flashFab();
         showToast('💬 New message received!', 'success');
       }
     } catch (_) { /* silent */ }
-  }, 15000);
+  }, 15000); // every 15 seconds
 }
 
 // ── Supabase Realtime subscription ──────────────────────────
@@ -1672,20 +1662,27 @@ function groupMessagesByUser(messages) {
     }
     groups.get(key).msgs.push(m);
   });
-  // For each group pick the latest message and compute unread count
+  // For each group pick the latest message/reply activity and compute unread count
   const result = [];
   groups.forEach(g => {
-    const sorted = g.msgs.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Sort by most recent activity: replied_at beats created_at so admin replies surface to top
+    const sorted = g.msgs.slice().sort((a, b) => {
+      const ta = new Date(a.replied_at || a.created_at);
+      const tb = new Date(b.replied_at || b.created_at);
+      return tb - ta;
+    });
     const latest  = sorted[0];
     const unreadCt = g.msgs.filter(m => !m.read && !m.reply).length;
     const hasUnreplied = g.msgs.some(m => !m.reply);
     result.push({ latest, msgs: sorted, unreadCt, hasUnreplied });
   });
-  // Sort groups: unread first, then by latest message time
+  // Sort groups: unread first, then by latest activity time
   result.sort((a, b) => {
     if (a.unreadCt > 0 && b.unreadCt === 0) return -1;
     if (b.unreadCt > 0 && a.unreadCt === 0) return 1;
-    return new Date(b.latest.created_at) - new Date(a.latest.created_at);
+    const ta = new Date(a.latest.replied_at || a.latest.created_at);
+    const tb = new Date(b.latest.replied_at || b.latest.created_at);
+    return tb - ta;
   });
   return result;
 }
@@ -1701,11 +1698,16 @@ function renderMessages() {
   list.innerHTML = groups.map(g => {
     const m        = g.latest;
     const isUnread = g.unreadCt > 0;
-    const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
-    const isImage  = (m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]');
-    const preview  = isImage
-      ? `<span class="msg-item-preview-img">📷 Photo</span>`
-      : escHtml((m.message || '').substring(0, 120));
+    const timeStr  = formatMsgTime(new Date(m.replied_at || m.created_at));
+    // Show admin's reply as preview if they sent last, otherwise show user's message
+    const lastReply = m.reply || '';
+    const adminSentLast = !!lastReply;
+    const isImage  = !adminSentLast && ((m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]'));
+    const preview  = adminSentLast
+      ? `<span style="color:var(--indigo-light);font-size:0.72rem;font-weight:600">You: </span>${escHtml(lastReply.substring(0, 100))}`
+      : isImage
+        ? `<span class="msg-item-preview-img">📷 Photo</span>`
+        : escHtml((m.message || '').substring(0, 120));
     const trackBit = m.track_code ? `<div class="msg-item-track">📦 ${escHtml(m.track_code)}</div>` : '';
     const repliedBadge = !g.hasUnreplied
       ? `<span style="font-size:0.6rem;background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:1px 6px;flex-shrink:0">✓ Replied</span>`
@@ -1740,11 +1742,16 @@ function renderMessagesPage() {
   list.innerHTML = groups.map(g => {
     const m        = g.latest;
     const isUnread = g.unreadCt > 0;
-    const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
-    const isImage  = (m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]');
-    const preview  = isImage
-      ? `<span class="msg-item-preview-img">📷 Photo</span>`
-      : escHtml((m.message || '').substring(0, 120));
+    const timeStr  = formatMsgTime(new Date(m.replied_at || m.created_at));
+    // Show admin's reply as preview if they sent last, otherwise show user's message
+    const lastReply = m.reply || '';
+    const adminSentLast = !!lastReply;
+    const isImage  = !adminSentLast && ((m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]'));
+    const preview  = adminSentLast
+      ? `<span style="color:var(--indigo-light);font-size:0.72rem;font-weight:600">You: </span>${escHtml(lastReply.substring(0, 100))}`
+      : isImage
+        ? `<span class="msg-item-preview-img">📷 Photo</span>`
+        : escHtml((m.message || '').substring(0, 120));
     const trackBit = m.track_code ? `<div class="msg-item-track">📦 ${escHtml(m.track_code)}</div>` : '';
     const repliedBadge = !g.hasUnreplied
       ? `<span style="font-size:0.6rem;background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:1px 6px;flex-shrink:0">✓ Replied</span>`
@@ -1822,8 +1829,6 @@ function openChatScreen(msgId) {
   // Open screen
   document.getElementById('adminChatScreen').classList.add('open');
   document.getElementById('csInput').focus();
-  // Push a history entry so the phone's back button can close this screen
-  history.pushState({ chatOpen: true }, '');
 
   // Mark every unread message in THIS user's group as read (only this user's)
   const unreadInGroup = userMsgs.filter(x => !x.read);
