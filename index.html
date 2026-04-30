@@ -1461,7 +1461,7 @@ function renderMessages() {
   list.innerHTML = allMessages.map(m => {
     const isUnread = !m.reply && !m.read;
     const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
-    const isImage  = (m.message || '').startsWith('[image]');
+    const isImage  = (m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]');
     const preview  = isImage
       ? `<span class="msg-item-preview-img">📷 Photo</span>`
       : escHtml((m.message || '').substring(0, 120));
@@ -1469,7 +1469,6 @@ function renderMessages() {
     const repliedBadge = m.reply
       ? `<span style="font-size:0.6rem;background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:1px 6px;flex-shrink:0">✓ Replied</span>`
       : '';
-
     return `<div class="msg-item${isUnread ? ' unread' : ''}" onclick="openReplyModal(${m.id})">
       <div class="msg-item-head">
         <span class="msg-item-name">${escHtml(m.name || m.full_name || 'Unknown')}</span>
@@ -1494,7 +1493,7 @@ function renderMessagesPage() {
   list.innerHTML = allMessages.map(m => {
     const isUnread = !m.reply && !m.read;
     const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
-    const isImage  = (m.message || '').startsWith('[image]');
+    const isImage  = (m.message || '').startsWith('[image]') || (m.message || '').startsWith('[image-path]');
     const preview  = isImage
       ? `<span class="msg-item-preview-img">📷 Photo</span>`
       : escHtml((m.message || '').substring(0, 120));
@@ -1547,11 +1546,30 @@ async function openReplyModal(msgId) {
   `;
 
   const msgContent = m.message || '—';
-  const isImage = msgContent.startsWith('[image]');
-  if (isImage) {
+  const isImagePath = msgContent.startsWith('[image-path]');
+  const isImageLegacy = msgContent.startsWith('[image]');
+  if (isImagePath) {
+    // Private bucket — create a signed URL (valid 1 hour) that only this admin session uses
+    const storagePath = msgContent.slice(12);
+    document.getElementById('replyMsgBody').innerHTML =
+      `<span style="font-size:0.72rem;color:var(--muted)">📷 Loading secure photo…</span>`;
+    try {
+      const { data: signedData, error: signErr } = await _sb
+        .storage
+        .from('chat-images')
+        .createSignedUrl(storagePath, 3600); // 1 hour
+      if (signErr || !signedData?.signedUrl) throw signErr || new Error('No signed URL');
+      document.getElementById('replyMsgBody').innerHTML =
+        `<img class="chat-bubble-img" src="${signedData.signedUrl.replace(/"/g,'&quot;')}" alt="Photo" onclick="openLightbox(this.src)" loading="lazy" /><br><span style="font-size:0.72rem;color:var(--muted)">📷 User sent a photo (secure link · expires 1 hr)</span>`;
+    } catch (e) {
+      document.getElementById('replyMsgBody').innerHTML =
+        `<span style="color:var(--danger);font-size:0.8rem">⚠ Could not load photo. Ensure the bucket policy allows admin createSignedUrl.</span>`;
+    }
+  } else if (isImageLegacy) {
+    // Legacy public-URL messages (before policy change) — still render but note it
     const imgUrl = msgContent.slice(7);
     document.getElementById('replyMsgBody').innerHTML =
-      `<img class="chat-bubble-img" src="${imgUrl.replace(/"/g,'&quot;')}" alt="Photo" onclick="openLightbox(this.src)" loading="lazy" /><br><span style="font-size:0.72rem;color:var(--muted)">📷 User sent a photo</span>`;
+      `<img class="chat-bubble-img" src="${imgUrl.replace(/"/g,'&quot;')}" alt="Photo" onclick="openLightbox(this.src)" loading="lazy" /><br><span style="font-size:0.72rem;color:var(--muted)">📷 Legacy public photo</span>`;
   } else {
     document.getElementById('replyMsgBody').textContent = msgContent;
   }
