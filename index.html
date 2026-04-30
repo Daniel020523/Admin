@@ -33,14 +33,19 @@
     --cyan: #22d3ee;
   }
 
+  html, body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
   html { scroll-behavior: smooth; }
 
   body {
     font-family: 'Outfit', sans-serif;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
+    overflow: hidden;
   }
 
   /* ── Background ── */
@@ -125,10 +130,10 @@
   }
 
   /* ── Main App ── */
-  #app { display: none; position: relative; z-index: 2; min-height: 100vh; }
+  #app { display: none; position: relative; z-index: 2; height: 100dvh; height: 100vh; overflow: hidden; }
 
   /* ── Sidebar ── */
-  .layout { display: flex; min-height: 100vh; }
+  .layout { display: flex; height: 100%; overflow: hidden; }
 
   .sidebar {
     width: 240px; flex-shrink: 0;
@@ -137,6 +142,8 @@
     display: flex; flex-direction: column;
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 50;
     padding: 1.5rem 1rem;
+    height: 100%; height: 100dvh;
+    overflow-y: auto;
   }
   @media (max-width: 768px) {
     .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
@@ -189,7 +196,7 @@
   .logout-btn:hover { background: var(--danger-dim); color: var(--danger); border-color: rgba(248,113,113,0.2); }
 
   /* ── Content ── */
-  .content { margin-left: 240px; padding: 2rem; min-height: 100vh; }
+  .content { margin-left: 240px; padding: 2rem; height: 100%; overflow-y: auto; overflow-x: hidden; }
   @media (max-width: 768px) { .content { margin-left: 0; padding: 1rem; } }
 
   /* ── Top Bar ── */
@@ -436,9 +443,150 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--surface); }
   ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── Messages Floating Button ── */
+  .msg-fab {
+    position: fixed; bottom: 2rem; left: 2rem; z-index: 400;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #4338ca, #6366f1);
+    border: none; cursor: pointer; color: #fff; font-size: 1.4rem;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 6px 24px rgba(99,102,241,0.55);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .msg-fab.visible { display: flex !important; }
+  .msg-fab:hover { transform: scale(1.1) translateY(-2px); box-shadow: 0 10px 32px rgba(99,102,241,0.7); }
+  .msg-fab-badge {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--danger); color: #fff;
+    font-size: 0.6rem; font-weight: 800; min-width: 18px; height: 18px;
+    border-radius: 9px; display: none; align-items: center; justify-content: center;
+    padding: 0 4px; border: 2px solid var(--bg); letter-spacing: 0;
+  }
+
+  /* ── Messages Panel ── */
+  .msg-panel {
+    position: fixed; bottom: 6.5rem; left: 2rem; z-index: 400;
+    width: 380px; max-height: 560px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 20px; display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.08);
+    transform: translateY(16px) scale(0.96); opacity: 0; pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  .msg-panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: all; }
+  @media (max-width: 500px) {
+    .msg-panel { left: 1rem; right: 1rem; width: auto; bottom: 6rem; }
+    .msg-fab { left: 1rem; bottom: 1rem; }
+  }
+
+  .msg-panel-header {
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .msg-panel-title { font-size: 0.92rem; font-weight: 800; color: #fff; }
+  .msg-panel-sub { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
+  .msg-panel-close {
+    background: none; border: none; color: var(--muted); font-size: 1.1rem;
+    cursor: pointer; line-height: 1; padding: 0.2rem;
+    transition: color 0.15s;
+  }
+  .msg-panel-close:hover { color: var(--text); }
+
+  .msg-list {
+    flex: 1; overflow-y: auto; padding: 0.75rem;
+    display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .msg-list::-webkit-scrollbar { width: 4px; }
+  .msg-list::-webkit-scrollbar-track { background: transparent; }
+  .msg-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .msg-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 0.85rem 1rem;
+    cursor: pointer; transition: all 0.18s;
+  }
+  .msg-item:hover { border-color: var(--border2); background: var(--surface3); }
+  .msg-item.unread { border-color: rgba(99,102,241,0.3); background: var(--indigo-dim); }
+  .msg-item-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; gap: 0.5rem; }
+  .msg-item-name { font-size: 0.8rem; font-weight: 700; color: #fff; }
+  .msg-item-time { font-size: 0.65rem; color: var(--muted); white-space: nowrap; }
+  .msg-item-track { font-size: 0.65rem; color: var(--indigo-light); font-family: 'JetBrains Mono', monospace; margin-bottom: 0.3rem; }
+  .msg-item-preview { font-size: 0.76rem; color: var(--muted); line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .msg-unread-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--indigo-bright); flex-shrink: 0; margin-left: auto;
+  }
+
+  .msg-empty {
+    padding: 2.5rem 1rem; text-align: center;
+    color: var(--muted); font-size: 0.82rem;
+  }
+  .msg-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5; }
+  .msg-loading { padding: 2rem; text-align: center; color: var(--muted); font-size: 0.8rem; }
+
+  /* ── Reply Modal ── */
+  .reply-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+  .reply-meta { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+  .reply-meta-row { display: flex; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.75rem; }
+  .reply-meta-row:last-child { margin-bottom: 0; }
+  .reply-meta-label { color: var(--muted); font-weight: 600; min-width: 52px; flex-shrink: 0; }
+  .reply-meta-val { color: var(--text); font-weight: 500; word-break: break-all; }
+  .reply-msg-box {
+    background: var(--surface3); border: 1px solid var(--border2);
+    border-radius: 12px; padding: 0.9rem 1rem;
+    font-size: 0.82rem; color: var(--text); line-height: 1.6;
+    margin-bottom: 1rem; max-height: 120px; overflow-y: auto;
+  }
+  .reply-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.5rem; }
+  .reply-textarea {
+    width: 100%; min-height: 90px; padding: 0.85rem 1rem;
+    background: var(--surface2); border: 1.5px solid var(--border2);
+    border-radius: 12px; color: #fff; font-family: 'Outfit', sans-serif;
+    font-size: 0.86rem; line-height: 1.5; outline: none; resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .reply-textarea:focus { border-color: var(--indigo-bright); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+  .reply-textarea::placeholder { color: var(--muted2); }
+
+  /* ── Image in chat bubbles / reply modal ── */
+  .chat-bubble-img {
+    max-width: 100%; max-height: 200px;
+    border-radius: 8px; display: block;
+    margin-bottom: 0.25rem; cursor: pointer;
+    border: 1px solid var(--border2);
+  }
+  .msg-item-preview-img {
+    font-size: 0.72rem; color: var(--indigo-light);
+  }
+
+  /* ── Lightbox ── */
+  .lightbox {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.92); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 90vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
+  .lightbox-close {
+    position: absolute; top: 1rem; right: 1rem;
+    background: rgba(255,255,255,0.1); border: none; color: #fff;
+    font-size: 1.4rem; width: 40px; height: 40px; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.2); }
 </style>
 </head>
 <body>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="Photo" />
+</div>
 
 <div class="bg-fx"></div>
 <div class="grid-fx"></div>
@@ -484,6 +632,10 @@
       </div>
       <div class="nav-item" id="nav-search" onclick="switchPage('search')">
         <span class="nav-icon">🔍</span> Search
+      </div>
+      <div class="nav-item" id="nav-messages" onclick="switchPage('messages')">
+        <span class="nav-icon">💬</span> Messages
+        <span class="nav-badge" id="msgNavBadge" style="display:none"></span>
       </div>
 
       <div class="sidebar-footer">
@@ -624,6 +776,19 @@
         </div>
       </div>
 
+      <!-- ── MESSAGES PAGE ── -->
+      <div class="page" id="page-messages">
+        <div class="table-card">
+          <div class="table-header">
+            <span class="table-title">💬 User Messages <span id="realtimeDot2" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warning);margin-left:6px;vertical-align:middle;transition:background 0.3s"></span></span>
+            <span class="table-count" id="msgPageSub">Loading…</span>
+          </div>
+          <div class="msg-list" id="msgListPage" style="padding:0.75rem;display:flex;flex-direction:column;gap:0.6rem;min-height:200px;max-height:calc(100vh - 220px);overflow-y:auto">
+            <div style="text-align:center;padding:2rem;color:var(--muted)"><span class="spin">⟳</span> Loading…</div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /layout -->
 </div><!-- /app -->
@@ -698,6 +863,58 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- ════════════════════════════════════════
+     FLOATING MESSAGES BUTTON + PANEL
+════════════════════════════════════════ -->
+<button class="msg-fab" id="msgFab" onclick="switchPage('messages')" title="User Messages">
+  💬
+  <span class="msg-fab-badge" id="msgBadge"></span>
+</button>
+
+<div class="msg-panel" id="msgPanel">
+  <div class="msg-panel-header">
+    <div>
+      <div class="msg-panel-title">💬 User Messages <span id="realtimeDot" title="Connecting…" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warning);margin-left:6px;vertical-align:middle;transition:background 0.3s"></span></div>
+      <div class="msg-panel-sub" id="msgPanelSub">Loading…</div>
+    </div>
+    <button class="msg-panel-close" onclick="toggleMsgPanel()">✕</button>
+  </div>
+  <div class="msg-list" id="msgList">
+    <div class="msg-loading"><span class="spin">⟳</span> &nbsp;Loading messages…</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     REPLY MODAL
+════════════════════════════════════════ -->
+<div class="modal-backdrop" id="replyModal">
+  <div class="modal" style="max-width:520px">
+    <div class="reply-modal-header">
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <button id="replyBackBtn" onclick="goBackToBooking()" title="Edit package status" style="background:var(--indigo-dim);border:1px solid var(--border2);color:var(--indigo-light);border-radius:8px;padding:0.3rem 0.7rem;font-size:0.78rem;font-weight:700;cursor:pointer;display:none;align-items:center;gap:0.35rem;font-family:'Outfit',sans-serif;transition:all 0.18s">← Edit Package</button>
+        <div class="modal-title">Reply to Message</div>
+      </div>
+      <button onclick="closeModal('replyModal')" style="background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div class="modal-sub" id="replyModalSub">—</div>
+
+    <div class="reply-meta" id="replyMeta"></div>
+
+    <div style="font-size:0.62rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">User's Message</div>
+    <div class="reply-msg-box" id="replyMsgBody">—</div>
+
+    <label class="reply-label" for="replyTextarea">Your Reply</label>
+    <textarea class="reply-textarea" id="replyTextarea" placeholder="Type your reply here…"></textarea>
+
+    <div class="modal-btn-row">
+      <button class="modal-btn cancel" onclick="closeModal('replyModal')">Cancel</button>
+      <button class="modal-btn primary" id="sendReplyBtn" onclick="sendReply()">✉️ &nbsp;Send Reply</button>
+    </div>
+    <div class="modal-success" id="replySuccess">✓ Reply saved successfully!</div>
+    <div class="modal-error-msg" id="replyError">⚠ Failed to save reply. Try again.</div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -740,6 +957,8 @@ function doLogout() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('pwdInput').value = '';
+  document.getElementById('msgFab').classList.remove('visible');
+  document.getElementById('msgPanel').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -748,6 +967,10 @@ function doLogout() {
 function initApp() {
   startClock();
   loadDashboard();
+  document.getElementById('msgFab').classList.add('visible');
+  loadMessages();
+  subscribeMessages();
+  startPollingFallback();
 }
 
 function startClock() {
@@ -768,11 +991,16 @@ function switchPage(name) {
   document.getElementById('nav-' + name).classList.add('active');
   document.getElementById('sidebar').classList.remove('open');
 
-  const titles = { overview: ['Overview', 'Dashboard summary'], bookings: ['All Bookings', 'View and manage every booking'], search: ['Search', 'Find a booking by code or email'] };
+  const titles = { overview: ['Overview', 'Dashboard summary'], bookings: ['All Bookings', 'View and manage every booking'], search: ['Search', 'Find a booking by code or email'], messages: ['Messages', 'View and reply to user messages'] };
   document.getElementById('pageTitle').textContent = titles[name][0];
   document.getElementById('pageSub').textContent   = titles[name][1];
 
   if (name === 'bookings') loadAllBookings();
+  if (name === 'messages') renderMessagesPage();
+
+  // Hide the FAB when on the messages page (it's redundant there)
+  const fab = document.getElementById('msgFab');
+  if (fab) fab.classList.toggle('visible', name !== 'messages');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1063,12 +1291,338 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Lightbox ────────────────────────────────────────────────
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
 // ESC to close modals
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+    if (msgPanelOpen) { msgPanelOpen = false; document.getElementById('msgPanel').classList.remove('open'); }
+    closeLightbox();
   }
 });
+// ═══════════════════════════════════════════════════════════
+//  MESSAGES — REALTIME
+// ═══════════════════════════════════════════════════════════
+let allMessages    = [];
+let currentReplyId = null;
+let msgPanelOpen   = false;
+let _realtimeChannel = null;
+
+// FAB + messages are initialized from initApp() above
+
+// ── Polling fallback — always-on refresh ────────────────────
+let _pollInterval = null;
+function startPollingFallback() {
+  if (_pollInterval) clearInterval(_pollInterval);
+  _pollInterval = setInterval(async () => {
+    // Silent refresh in background
+    try {
+      const { data, error } = await _sb
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const prev = allMessages.length;
+      allMessages = data || [];
+      updateBadgeAndHeader();
+      renderMessages();
+      // If new messages arrived while realtime was down, flash
+      if (allMessages.length > prev) {
+        flashFab();
+        showToast('💬 New message received!', 'success');
+      }
+    } catch (_) { /* silent */ }
+  }, 15000); // every 15 seconds
+}
+
+// ── Supabase Realtime subscription ──────────────────────────
+let _reconnectTimer = null;
+function subscribeMessages() {
+  if (_realtimeChannel) {
+    try { _sb.removeChannel(_realtimeChannel); } catch(_) {}
+  }
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+
+  _realtimeChannel = _sb
+    .channel('messages-realtime-' + Date.now()) // unique channel name to avoid conflicts
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'messages' },
+      (payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+
+        if (eventType === 'INSERT') {
+          // Prepend new message to top
+          allMessages.unshift(newRow);
+          // Flash FAB and play a subtle ping
+          flashFab();
+          showToast('💬 New message from ' + (newRow.name || newRow.full_name || 'a user'), 'success');
+        } else if (eventType === 'UPDATE') {
+          const idx = allMessages.findIndex(m => m.id === newRow.id);
+          if (idx !== -1) allMessages[idx] = newRow;
+          else allMessages.unshift(newRow);
+        } else if (eventType === 'DELETE') {
+          allMessages = allMessages.filter(m => m.id !== oldRow.id);
+        }
+
+        updateBadgeAndHeader();
+        renderMessages();
+      }
+    )
+    .subscribe((status) => {
+      const dot = document.getElementById('realtimeDot');
+      if (!dot) return;
+      if (status === 'SUBSCRIBED') {
+        dot.style.background = 'var(--success)';
+        dot.title = 'Realtime connected ✓';
+        if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+        // Refresh once on reconnect to catch any missed messages
+        loadMessages();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        dot.style.background = 'var(--danger)';
+        dot.title = 'Realtime disconnected — retrying in 5s…';
+        // Auto-reconnect with backoff
+        if (!_reconnectTimer) {
+          _reconnectTimer = setTimeout(() => {
+            _reconnectTimer = null;
+            subscribeMessages();
+          }, 5000);
+        }
+      } else {
+        dot.style.background = 'var(--warning)';
+        dot.title = 'Connecting…';
+      }
+    });
+}
+
+function flashFab() {
+  const fab = document.getElementById('msgFab');
+  fab.style.transform = 'scale(1.25)';
+  setTimeout(() => fab.style.transform = '', 300);
+}
+
+function toggleMsgPanel() {
+  msgPanelOpen = !msgPanelOpen;
+  document.getElementById('msgPanel').classList.toggle('open', msgPanelOpen);
+}
+
+async function loadMessages() {
+  try {
+    const { data, error } = await _sb
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    allMessages = data || [];
+    updateBadgeAndHeader();
+    renderMessages();
+  } catch (err) {
+    console.error('Messages load error:', err);
+    document.getElementById('msgList').innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">⚠️</div>Could not load messages.<br><small style="font-size:0.7rem">Make sure the "messages" table exists in Supabase.</small></div>`;
+  }
+}
+
+function updateBadgeAndHeader() {
+  const unread = allMessages.filter(m => !m.read).length;
+  const badge  = document.getElementById('msgBadge');
+  const navBadge = document.getElementById('msgNavBadge');
+  if (unread > 0) {
+    const label = unread > 99 ? '99+' : unread;
+    badge.textContent    = label;
+    badge.style.display  = 'flex';
+    navBadge.textContent = label;
+    navBadge.style.display = 'inline-block';
+  } else {
+    badge.style.display  = 'none';
+    navBadge.style.display = 'none';
+  }
+  const subText = `${allMessages.length} message${allMessages.length !== 1 ? 's' : ''}${unread > 0 ? ` · ${unread} unread` : ''} · 🟢 live`;
+  document.getElementById('msgPanelSub').textContent = subText;
+  const pageSubEl = document.getElementById('msgPageSub');
+  if (pageSubEl) pageSubEl.textContent = subText;
+}
+
+function renderMessages() {
+  const list = document.getElementById('msgList');
+  if (!allMessages.length) {
+    list.innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">💬</div>No messages yet.<br>Messages sent from the tracking page will appear here.</div>`;
+    return;
+  }
+
+  list.innerHTML = allMessages.map(m => {
+    const isUnread = !m.reply && !m.read;
+    const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
+    const isImage  = (m.message || '').startsWith('[image]');
+    const preview  = isImage
+      ? `<span class="msg-item-preview-img">📷 Photo</span>`
+      : escHtml((m.message || '').substring(0, 120));
+    const trackBit = m.track_code ? `<div class="msg-item-track">📦 ${escHtml(m.track_code)}</div>` : '';
+    const repliedBadge = m.reply
+      ? `<span style="font-size:0.6rem;background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:1px 6px;flex-shrink:0">✓ Replied</span>`
+      : '';
+
+    return `<div class="msg-item${isUnread ? ' unread' : ''}" onclick="openReplyModal(${m.id})">
+      <div class="msg-item-head">
+        <span class="msg-item-name">${escHtml(m.name || m.full_name || 'Unknown')}</span>
+        ${repliedBadge}
+        ${isUnread ? '<span class="msg-unread-dot"></span>' : ''}
+        <span class="msg-item-time">${timeStr}</span>
+      </div>
+      ${trackBit}
+      <div class="msg-item-preview">${preview}</div>
+    </div>`;
+  }).join('');
+  renderMessagesPage();
+}
+
+function renderMessagesPage() {
+  const list = document.getElementById('msgListPage');
+  if (!list) return;
+  if (!allMessages.length) {
+    list.innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">💬</div>No messages yet.<br>Messages sent from the tracking page will appear here.</div>`;
+    return;
+  }
+  list.innerHTML = allMessages.map(m => {
+    const isUnread = !m.reply && !m.read;
+    const timeStr  = m.created_at ? formatMsgTime(new Date(m.created_at)) : '—';
+    const isImage  = (m.message || '').startsWith('[image]');
+    const preview  = isImage
+      ? `<span class="msg-item-preview-img">📷 Photo</span>`
+      : escHtml((m.message || '').substring(0, 120));
+    const trackBit = m.track_code ? `<div class="msg-item-track">📦 ${escHtml(m.track_code)}</div>` : '';
+    const repliedBadge = m.reply
+      ? `<span style="font-size:0.6rem;background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:1px 6px;flex-shrink:0">✓ Replied</span>`
+      : '';
+    return `<div class="msg-item${isUnread ? ' unread' : ''}" onclick="openReplyModal(${m.id})">
+      <div class="msg-item-head">
+        <span class="msg-item-name">${escHtml(m.name || m.full_name || 'Unknown')}</span>
+        ${repliedBadge}
+        ${isUnread ? '<span class="msg-unread-dot"></span>' : ''}
+        <span class="msg-item-time">${timeStr}</span>
+      </div>
+      ${trackBit}
+      <div class="msg-item-preview">${preview}</div>
+    </div>`;
+  }).join('');
+}
+
+function formatMsgTime(date) {
+  const now  = new Date();
+  const diff = (now - date) / 1000;
+  if (diff < 60)    return 'Just now';
+  if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return date.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
+async function openReplyModal(msgId) {
+  const m = allMessages.find(x => x.id === msgId);
+  if (!m) return;
+
+  currentReplyId = msgId;
+
+  // Show back button only when the message has a linked track code
+  const backBtn = document.getElementById('replyBackBtn');
+  if (backBtn) {
+    backBtn.style.display = m.track_code ? 'inline-flex' : 'none';
+  }
+
+  document.getElementById('replyModalSub').textContent =
+    `From ${m.name || m.full_name || 'Unknown'} · ${m.created_at ? new Date(m.created_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}`;
+
+  document.getElementById('replyMeta').innerHTML = `
+    <div class="reply-meta-row"><span class="reply-meta-label">Name</span><span class="reply-meta-val">${escHtml(m.name || m.full_name || '—')}</span></div>
+    <div class="reply-meta-row"><span class="reply-meta-label">Email</span><span class="reply-meta-val">${escHtml(m.email || '—')}</span></div>
+    ${m.track_code ? `<div class="reply-meta-row"><span class="reply-meta-label">Track</span><span class="reply-meta-val" style="font-family:'JetBrains Mono',monospace;color:var(--indigo-light)">${escHtml(m.track_code)}</span></div>` : ''}
+    ${m.phone ? `<div class="reply-meta-row"><span class="reply-meta-label">Phone</span><span class="reply-meta-val">${escHtml(m.phone)}</span></div>` : ''}
+  `;
+
+  const msgContent = m.message || '—';
+  const isImage = msgContent.startsWith('[image]');
+  if (isImage) {
+    const imgUrl = msgContent.slice(7);
+    document.getElementById('replyMsgBody').innerHTML =
+      `<img class="chat-bubble-img" src="${imgUrl.replace(/"/g,'&quot;')}" alt="Photo" onclick="openLightbox(this.src)" loading="lazy" /><br><span style="font-size:0.72rem;color:var(--muted)">📷 User sent a photo</span>`;
+  } else {
+    document.getElementById('replyMsgBody').textContent = msgContent;
+  }
+  document.getElementById('replyTextarea').value = m.reply || '';
+  document.getElementById('replySuccess').style.display = 'none';
+  document.getElementById('replyError').style.display   = 'none';
+
+  // Mark as read
+  if (!m.read) {
+    await _sb.from('messages').update({ read: true }).eq('id', msgId);
+    m.read = true;
+    renderMessages();
+    loadMessages();
+  }
+
+  openModal('replyModal');
+}
+
+function goBackToBooking() {
+  const m = allMessages.find(x => x.id === currentReplyId);
+  if (!m || !m.track_code) return;
+  const booking = allBookings.find(b => b.track_code === m.track_code);
+  if (!booking) {
+    showToast('⚠ Could not find linked booking.', 'error');
+    return;
+  }
+  closeModal('replyModal');
+  openViewModal(booking);
+}
+
+async function sendReply() {
+  if (!currentReplyId) return;
+  const replyText = document.getElementById('replyTextarea').value.trim();
+  if (!replyText) {
+    showToast('⚠ Please type a reply first.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sendReplyBtn');
+  btn.innerHTML = '<span class="spin">⟳</span> &nbsp;Saving…';
+  btn.style.pointerEvents = 'none';
+
+  try {
+    const { error } = await _sb
+      .from('messages')
+      .update({ reply: replyText, replied_at: new Date().toISOString(), read: true })
+      .eq('id', currentReplyId);
+
+    if (error) throw error;
+
+    // Update local cache
+    const m = allMessages.find(x => x.id === currentReplyId);
+    if (m) { m.reply = replyText; m.read = true; }
+
+    document.getElementById('replySuccess').style.display = 'block';
+    document.getElementById('replyError').style.display   = 'none';
+    showToast('✅ Reply sent!', 'success');
+    renderMessages();
+    loadMessages();
+    setTimeout(() => closeModal('replyModal'), 1400);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('replyError').style.display   = 'block';
+    document.getElementById('replySuccess').style.display = 'none';
+    showToast('⚠ Failed to save reply.', 'error');
+  } finally {
+    btn.innerHTML = '✉️ &nbsp;Send Reply';
+    btn.style.pointerEvents = 'all';
+  }
+}
+
 </script>
 </body>
 </html>
