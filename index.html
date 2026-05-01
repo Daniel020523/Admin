@@ -1657,7 +1657,6 @@ function subscribeMessages() {
         const { eventType, new: newRow, old: oldRow } = payload;
 
         if (eventType === 'INSERT') {
-          // Only add if not already in cache (prevents duplicates on reconnect/reload races)
           if (!allMessages.find(m => m.id === newRow.id)) {
             allMessages.unshift(newRow);
             flashFab();
@@ -1737,11 +1736,10 @@ async function loadMessages() {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    // Replace entirely with authoritative DB data — clears any in-memory duplicates
-    allMessages = (data || []).filter(row => row && row.id);
+    // Full authoritative reset — clears any duplicates accumulated in memory
+    allMessages = (data || []).filter(r => r && r.id);
     updateBadgeAndHeader();
     renderMessages();
-    // If the chat screen is open, rebuild it too so it stays in sync
     if (csCurrentUser) csRebuildChat();
   } catch (err) {
     console.error('Messages load error:', err);
@@ -2008,7 +2006,6 @@ function closeChatScreen() {
   document.getElementById('adminChatScreen').classList.remove('open');
   csCurrentMsgId = null;
   csCurrentUser  = null;
-  // loadMessages handles both renderMessages + badge update — no need to call renderMessages separately
   loadMessages();
 }
 
@@ -2058,7 +2055,8 @@ function csSubscribe(trackCode, fallbackName) {
       if (!belongs) return;
       if (!allMessages.find(x => x.id === payload.new.id)) allMessages.push(payload.new);
       const existing = document.querySelector(`[data-cs-msg-id="${payload.new.id}"]`);
-      if (!existing && (payload.new.message || '') !== '[admin-sent]') { csRenderUserBubble(payload.new); csScrollBottom(); csAppendSysMsg('New message from user'); }    })
+      if (!existing && (payload.new.message || '') !== '[admin-sent]') { csRenderUserBubble(payload.new); csScrollBottom(); csAppendSysMsg('New message from user'); }
+    })
     .on('broadcast', { event: 'user_typing_start' }, (payload) => {
       if (payload.payload && payload.payload.track_code === trackCode) {
         showUserTyping();
