@@ -707,6 +707,57 @@
   .cs-send-btn:active { transform: scale(0.96); }
   .cs-send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+  /* Admin photo button */
+  .cs-photo-btn {
+    width: 44px; height: 44px; flex-shrink: 0;
+    background: var(--surface2);
+    border: 1.5px solid var(--border2);
+    border-radius: 12px; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 1.1rem;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .cs-photo-btn:hover { color: var(--indigo-light); border-color: var(--indigo-bright); background: var(--indigo-dim); }
+  .cs-photo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Admin upload progress */
+  .cs-upload-progress {
+    font-size: 0.72rem; color: var(--muted);
+    text-align: center; padding: 0.25rem 0;
+    background: rgba(5,8,22,0.9);
+    display: none; flex-shrink: 0;
+  }
+  .cs-upload-progress.show { display: block; }
+
+  /* ── User typing indicator in chat ── */
+  .cs-typing-bubble {
+    display: none;
+    align-items: flex-end;
+    gap: 0.5rem;
+    position: relative; z-index: 1;
+    animation: csBubbleIn 0.25s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .cs-typing-bubble.show { display: flex; }
+  .cs-typing-inner {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    border-radius: 16px; border-bottom-right-radius: 4px;
+    padding: 0.65rem 0.9rem;
+    display: flex; align-items: center; gap: 4px;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+  }
+  .cs-typing-inner span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.8);
+    animation: csTypingBounce 1.2s ease-in-out infinite;
+    display: block;
+  }
+  .cs-typing-inner span:nth-child(2) { animation-delay: 0.2s; }
+  .cs-typing-inner span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes csTypingBounce {
+    0%,60%,100% { transform: translateY(0); opacity: 0.45; }
+    30%          { transform: translateY(-5px); opacity: 1; }
+  }
+
   /* ── Image in chat bubbles / reply modal ── */
   .chat-bubble-img {
     max-width: 100%; max-height: 200px;
@@ -1080,12 +1131,24 @@
   <!-- Messages -->
   <div class="cs-messages" id="csMessages">
     <div class="cs-sys-msg" id="csLoading">⟳ Loading chat…</div>
+    <!-- User typing indicator -->
+    <div class="cs-typing-bubble" id="csTypingBubble">
+      <div class="cs-bav user-av" id="csTypingAvatar">?</div>
+      <div class="cs-typing-inner">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
   </div>
 
   <!-- Input -->
   <div class="cs-input-bar">
+    <!-- Hidden file input for admin photo -->
+    <input type="file" id="csPhotoInput" accept="image/*" style="display:none" onchange="csHandlePhotoSelect(event)" />
+    <button class="cs-photo-btn" id="csPhotoBtn" onclick="document.getElementById('csPhotoInput').click()" title="Send a photo">
+      📷
+    </button>
     <textarea class="cs-textarea" id="csInput" rows="1" placeholder="Type your reply…"
-      onkeydown="csHandleKey(event)" oninput="csAutoResize(this)"></textarea>
+      onkeydown="csHandleKey(event)" oninput="csAutoResize(this); emitAdminTyping()"></textarea>
     <button class="cs-send-btn" id="csSendBtn" onclick="csSendReply()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
         <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1093,7 +1156,7 @@
       </svg>
     </button>
   </div>
-</div>
+  <div class="cs-upload-progress" id="csUploadProgress">📤 Uploading photo…</div>
 
 <!-- ════════════════════════════════════════
      REPLY MODAL
@@ -1136,7 +1199,7 @@ const SUPABASE_ANON = 'sb_publishable_MaHxITBZRvjweKDwS4cr8g__A6jZI0k';
 const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ⚠️  CHANGE THIS PASSWORD before deploying
-const ADMIN_PASSWORD = 'GlobalSky@Admin2025';
+const ADMIN_PASSWORD = 'Admin';
 
 // ═══════════════════════════════════════════════════════════
 //  STATE
@@ -1877,6 +1940,8 @@ function openChatScreen(msgId) {
 }
 
 function closeChatScreen() {
+  // Stop any active typing emit before tearing down
+  emitAdminStoppedTyping();
   // Remove sub first so no stale events fire during teardown
   if (csChannel) { try { _sb.removeChannel(csChannel); } catch(_){} csChannel = null; }
   document.getElementById('adminChatScreen').classList.remove('open');
@@ -1934,7 +1999,156 @@ function csSubscribe(trackCode, fallbackName) {
       const existing = document.querySelector(`[data-cs-msg-id="${payload.new.id}"]`);
       if (!existing) { csRenderUserBubble(payload.new); csScrollBottom(); csAppendSysMsg('New message from user'); }
     })
+    .on('broadcast', { event: 'user_typing_start' }, (payload) => {
+      if (payload.payload && payload.payload.track_code === trackCode) {
+        showUserTyping();
+      }
+    })
+    .on('broadcast', { event: 'user_typing_stop' }, (payload) => {
+      if (payload.payload && payload.payload.track_code === trackCode) {
+        hideUserTyping();
+      }
+    })
     .subscribe();
+}
+
+// ── TYPING INDICATORS ──────────────────────────────────────────────────────────
+let _userTypingTimer  = null;
+
+function showUserTyping() {
+  const bubble = document.getElementById('csTypingBubble');
+  if (!bubble) return;
+  // Update avatar initials to match current user
+  const av = document.getElementById('csTypingAvatar');
+  if (av && csCurrentUser) {
+    const name = csCurrentUser.name || csCurrentUser.full_name || 'U';
+    av.textContent = name.slice(0, 1).toUpperCase();
+  }
+  bubble.classList.add('show');
+  const area = document.getElementById('csMessages');
+  area.appendChild(bubble); // keep at bottom
+  csScrollBottom();
+}
+
+function hideUserTyping() {
+  const bubble = document.getElementById('csTypingBubble');
+  if (bubble) bubble.classList.remove('show');
+  clearTimeout(_userTypingTimer);
+  _userTypingTimer = null;
+}
+
+// Admin typing emit — start/stop
+let _adminIsTyping  = false;
+let _adminStopTimer = null;
+
+function emitAdminTyping() {
+  if (!csChannel) return;
+
+  if (!_adminIsTyping) {
+    _adminIsTyping = true;
+    csChannel.send({
+      type: 'broadcast',
+      event: 'admin_typing_start',
+      payload: { track_code: csCurrentUser ? csCurrentUser.track_code : null }
+    });
+  }
+
+  clearTimeout(_adminStopTimer);
+  _adminStopTimer = setTimeout(() => {
+    _adminIsTyping = false;
+    if (csChannel) csChannel.send({
+      type: 'broadcast',
+      event: 'admin_typing_stop',
+      payload: { track_code: csCurrentUser ? csCurrentUser.track_code : null }
+    });
+  }, 1500);
+}
+
+function emitAdminStoppedTyping() {
+  if (!csChannel || !_adminIsTyping) return;
+  _adminIsTyping = false;
+  clearTimeout(_adminStopTimer);
+  csChannel.send({
+    type: 'broadcast',
+    event: 'admin_typing_stop',
+    payload: { track_code: csCurrentUser ? csCurrentUser.track_code : null }
+  });
+}
+
+// ── ADMIN PHOTO UPLOAD ─────────────────────────────────────────────────────────
+async function csHandlePhotoSelect(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('⚠ Photo too large. Max 10 MB.', 'error');
+    return;
+  }
+
+  const photoBtn  = document.getElementById('csPhotoBtn');
+  const sendBtn   = document.getElementById('csSendBtn');
+  const progress  = document.getElementById('csUploadProgress');
+
+  photoBtn.disabled = true;
+  sendBtn.disabled  = true;
+  progress.classList.add('show');
+
+  try {
+    const trackCode = csCurrentUser ? csCurrentUser.track_code : null;
+    const ext       = file.name.split('.').pop() || 'jpg';
+    const fileName  = `admin_${trackCode || 'unknown'}_${Date.now()}.${ext}`;
+    const { error: uploadError } = await _sb
+      .storage
+      .from('chat-images')
+      .upload(fileName, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    // Render admin photo bubble immediately (optimistic)
+    const imgUrl = `https://azxbtwklromrnmyutmoz.supabase.co/storage/v1/object/public/chat-images/${fileName}`;
+
+    // We store admin photos by updating a new message row tagged as admin-sent
+    // Actually — admin photos go into a synthetic admin bubble (not a DB row for now)
+    // We'll use the existing reply update mechanism: update the latest unreplied msg reply with [image-path]
+    const targetId = csCurrentMsgId;
+    if (!targetId) { showToast('⚠ No message to attach photo to.', 'error'); return; }
+
+    const repliedAt = new Date().toISOString();
+    const { error } = await _sb
+      .from('messages')
+      .update({ reply: '[admin-image]' + fileName, replied_at: repliedAt, read: true })
+      .eq('id', targetId);
+
+    if (error) throw error;
+
+    // Update local cache
+    const m = allMessages.find(x => x.id === targetId);
+    if (m) { m.reply = '[admin-image]' + fileName; m.replied_at = repliedAt; m.read = true; }
+
+    // Render admin image bubble
+    const el = document.createElement('div');
+    el.className = 'cs-bubble-row admin-side';
+    el.dataset.csReplyFor = targetId;
+    el.innerHTML = `
+      <div class="cs-bav admin-av">A</div>
+      <div class="cs-bubble">
+        <img src="${escHtml(imgUrl)}" class="cs-bubble-img" alt="Photo" onclick="openLightbox('${escHtml(imgUrl)}')" style="cursor:pointer"
+          onerror="this.outerHTML='<div style=\\'color:rgba(255,255,255,0.5);font-size:0.8rem\\'>📷 Photo</div>'" />
+        <span class="cs-time">${csFmtTime(repliedAt)}</span>
+      </div>`;
+    document.getElementById('csMessages').appendChild(el);
+    csScrollBottom();
+    showToast('✅ Photo sent!', 'success');
+    renderMessages();
+  } catch (err) {
+    console.error('Admin photo upload error:', err);
+    showToast('⚠ Failed to upload photo.', 'error');
+  } finally {
+    photoBtn.disabled = false;
+    sendBtn.disabled  = false;
+    progress.classList.remove('show');
+  }
 }
 
 function csRenderUserBubble(row) {
@@ -1973,12 +2187,23 @@ function csRenderUserBubble(row) {
 function csRenderAdminBubble(row) {
   const area    = document.getElementById('csMessages');
   const timeStr = csFmtTime(row.replied_at || row.created_at);
+  const reply   = row.reply || '';
+  const isAdminImg = reply.startsWith('[admin-image]');
+  let bodyHtml;
+  if (isAdminImg) {
+    const fileName = reply.replace('[admin-image]', '');
+    const imgUrl   = `https://azxbtwklromrnmyutmoz.supabase.co/storage/v1/object/public/chat-images/${fileName}`;
+    bodyHtml = `<img src="${escHtml(imgUrl)}" class="cs-bubble-img" alt="Photo" onclick="openLightbox('${escHtml(imgUrl)}')" style="cursor:pointer"
+      onerror="this.outerHTML='<div style=\\'color:rgba(255,255,255,0.5);font-size:0.8rem\\'>📷 Photo</div>'" />`;
+  } else {
+    bodyHtml = escHtml(reply);
+  }
   const el      = document.createElement('div');
   el.className  = 'cs-bubble-row admin-side';
   el.dataset.csReplyFor = row.id;
   el.innerHTML  = `
     <div class="cs-bav admin-av">A</div>
-    <div class="cs-bubble">${escHtml(row.reply)}<span class="cs-time">${timeStr}</span></div>`;
+    <div class="cs-bubble">${bodyHtml}<span class="cs-time">${timeStr}</span></div>`;
   area.appendChild(el);
 }
 
@@ -2022,6 +2247,7 @@ async function csSendReply() {
   btn.disabled = true;
   document.getElementById('csInput').value = '';
   document.getElementById('csInput').style.height = '';
+  emitAdminStoppedTyping();
 
   // Optimistic UI — add reply bubble immediately, tagged with targetId
   // Remove any existing optimistic bubble for this row first to avoid dupes
